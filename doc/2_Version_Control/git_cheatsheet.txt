@@ -1,5 +1,4 @@
 git commit
-- hi
 git branch
 git checkout
 git pull
