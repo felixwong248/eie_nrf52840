@@ -8,6 +8,8 @@
 #include <zephyr/sys/printk.h>
 #include <inttypes.h>
 
+#define SLEEP_TIME_MS 1000
+
 #define SW0_NODE DT_ALIAS(sw0)
 static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
 
@@ -28,7 +30,7 @@ int main(void) {
     if (0 < ret){
       printk("Pressed!\n");
     }
-    k_msleep(1000);
+    k_msleep(SLEEP_TIME_MS);
   }
 	return 0;
 }
