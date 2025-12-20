@@ -23,7 +23,7 @@ typedef struct {
     // Context variable used by Zephyr to track state machine state. Must be first
     struct smf_ctx ctx;
 
-    uint16_t t_count;
+    uint16_t count;
 } led_state_object_t;
 
 /*----------------------------------------------------------
