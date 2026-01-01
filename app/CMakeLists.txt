@@ -10,8 +10,9 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(app LANGUAGES C)
 
 zephyr_include_directories(src)
-
-target_sources(app PRIVATE ../drivers/BTN/BTN.c)
-target_sources(app PRIVATE ../drivers/LED/LED.c)
+zephyr_include_directories(../drivers/BTN)
+zephyr_include_directories(../drivers/LED)
 
 target_sources(app PRIVATE src/main.c)
+target_sources(app PRIVATE ../drivers/BTN/BTN.c)
+target_sources(app PRIVATE ../drivers/LED/LED.c)
