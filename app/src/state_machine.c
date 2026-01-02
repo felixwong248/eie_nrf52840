@@ -81,6 +81,7 @@ static enum smf_state_result first_string_run(void *o){
         }
 
     }
+    else lesson_6_sm.count = 0;
     return SMF_EVENT_HANDLED;
 }
 
