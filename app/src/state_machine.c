@@ -9,7 +9,8 @@ enum state_machine_states {FIRST_STRING, SECOND_STRING, PRINT_STRING, STANDBY};
 typedef struct {
     struct smf_ctx ctx;
     uint16_t count;
-    uint16_t passcode;
+    uint16_t passcode[7];
+    int8_t passcode_index;
     uint8_t duty_cycle;
     int8_t direction;
     enum state_machine_states previous_state;
@@ -48,7 +49,10 @@ static const struct smf_state states[] = {
 void state_machine_init(void)
 {
     lesson_6_sm.count = 0;
-    lesson_6_sm.passcode = 0;
+    for (int i = 0; i < 7; i++) {
+        lesson_6_sm.passcode[i] = 0;
+    }
+    lesson_6_sm.passcode_index = 7;
     lesson_6_sm.duty_cycle = 0;
     lesson_6_sm.direction = 1;
     smf_set_initial(SMF_CTX(&lesson_6_sm), &states[FIRST_STRING]); // sets o to point at lesson_6_sm state machine (*o),
@@ -64,8 +68,12 @@ int state_machine_run(void)
 
 // FIRST_STRING FUNCTIONS
 static void first_string_entry(void *o){
+    state_object *sm = o;
     printk("ENTERED FIRST_STRING\n");
     LED_blink(LED3, LED_1HZ);
+    for (int i = 0; i < 7; i++) {
+        sm->passcode[i] = 0;
+    }
 }
 
 static enum smf_state_result first_string_run(void *o){
@@ -76,7 +84,21 @@ static enum smf_state_result first_string_run(void *o){
         return SMF_EVENT_HANDLED;
     }
 
-    if(BTN_check_clear_pressed(BTN2)){
+
+    if(sm->passcode_index >= 0){
+        if(BTN_check_clear_pressed(BTN0)){
+        sm->passcode[sm->passcode_index] = 0;
+        sm->passcode_index =- 1;
+        } else if(BTN_check_clear_pressed(BTN1)){
+        sm->passcode[sm->passcode_index] = 1;
+        sm->passcode_index =- 1;
+    }
+
+    }
+    
+
+
+    if(BTN_check_clear_pressed(BTN3)){
         smf_set_state(SMF_CTX(sm), &states[SECOND_STRING]);
     }
 
