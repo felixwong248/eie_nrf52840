@@ -9,8 +9,10 @@ enum state_machine_states {FIRST_STRING, SECOND_STRING, PRINT_STRING, STANDBY};
 typedef struct {
     struct smf_ctx ctx;
     uint16_t count;
-    uint16_t passcode[7];
-    int8_t passcode_index;
+
+    uint8_t passcode;
+    int8_t bit_index;
+
     uint8_t duty_cycle;
     int8_t direction;
     enum state_machine_states previous_state;
@@ -34,6 +36,8 @@ static void standby_exit(void *o);
 
 static int standby_checker_function(state_object *sm, enum state_machine_states current_state);
 
+static void passcode_add_bit(state_object *sm, uint8_t bit);
+static void passcode_clear(state_object *sm);
 
 /*----------------------------------------------------------
  * Local Variables
@@ -49,14 +53,16 @@ static const struct smf_state states[] = {
 void state_machine_init(void)
 {
     lesson_6_sm.count = 0;
-    for (int i = 0; i < 7; i++) {
-        lesson_6_sm.passcode[i] = 0;
-    }
-    lesson_6_sm.passcode_index = 7;
+
+    lesson_6_sm.passcode = 0;
+    lesson_6_sm.bit_index = 7;
+
     lesson_6_sm.duty_cycle = 0;
     lesson_6_sm.direction = 1;
     smf_set_initial(SMF_CTX(&lesson_6_sm), &states[FIRST_STRING]); // sets o to point at lesson_6_sm state machine (*o),
                                                                    // and sets first state to be FIRST_STRING
+
+    lesson_6_sm.previous_state = FIRST_STRING;
 }
 
 int state_machine_run(void)
@@ -65,15 +71,13 @@ int state_machine_run(void)
 }
 
 
-
 // FIRST_STRING FUNCTIONS
 static void first_string_entry(void *o){
     state_object *sm = o;
+    passcode_clear(sm);
     printk("ENTERED FIRST_STRING\n");
     LED_blink(LED3, LED_1HZ);
-    for (int i = 0; i < 7; i++) {
-        sm->passcode[i] = 0;
-    }
+
 }
 
 static enum smf_state_result first_string_run(void *o){
@@ -84,22 +88,23 @@ static enum smf_state_result first_string_run(void *o){
         return SMF_EVENT_HANDLED;
     }
 
-
-    if(sm->passcode_index >= 0){
-        if(BTN_check_clear_pressed(BTN0)){
-        sm->passcode[sm->passcode_index] = 0;
-        sm->passcode_index =- 1;
-        } else if(BTN_check_clear_pressed(BTN1)){
-        sm->passcode[sm->passcode_index] = 1;
-        sm->passcode_index =- 1;
-    }
-
+    // Reset entered bits
+    if (BTN_check_clear_pressed(BTN2)) {
+        printk("RESET PASSCODE\n");
+        passcode_clear(sm);
+        return SMF_EVENT_HANDLED;
     }
     
-
+    if(BTN_check_clear_pressed(BTN0)){          // adds 0 bit to passcode
+        passcode_add_bit(sm, 0);
+    } else if(BTN_check_clear_pressed(BTN1)){   // adds 1 bit to passcode
+        passcode_add_bit(sm, 1);
+    }
 
     if(BTN_check_clear_pressed(BTN3)){
+        if(sm->bit_index<0){
         smf_set_state(SMF_CTX(sm), &states[SECOND_STRING]);
+        }
     }
 
     return SMF_EVENT_HANDLED;
@@ -214,4 +219,24 @@ static int standby_checker_function(state_object *sm, enum state_machine_states 
     else sm->count = 0;
     
     return 0;
+}
+
+
+static void passcode_add_bit(state_object *sm, uint8_t bit){
+    if(sm->bit_index < 0){
+        printk("8 bit limit reached\n");
+        return;
+    } else if(bit) {
+        sm->passcode |= (1 << sm->bit_index);
+        printk("bit=1, index=%d\n", sm->bit_index);
+    } else {
+        printk("bit=0, index=%d\n", sm->bit_index);
+    }
+    sm->bit_index -= 1;
+    return;
+}
+
+static void passcode_clear(state_object *sm){
+    sm->passcode = 0;
+    sm->bit_index = 7;
 }
