@@ -38,6 +38,7 @@ static int standby_checker_function(state_object *sm, enum state_machine_states 
 
 static void passcode_add_bit(state_object *sm, uint8_t bit);
 static void passcode_clear(state_object *sm);
+static void Flash_LED(led_id led);
 
 /*----------------------------------------------------------
  * Local Variables
@@ -229,8 +230,10 @@ static void passcode_add_bit(state_object *sm, uint8_t bit){
     } else if(bit) {
         sm->passcode |= (1 << sm->bit_index);
         printk("bit=1, index=%d\n", sm->bit_index);
+        Flash_LED(LED1);
     } else {
         printk("bit=0, index=%d\n", sm->bit_index);
+        Flash_LED(LED0);
     }
     sm->bit_index -= 1;
     return;
@@ -239,4 +242,10 @@ static void passcode_add_bit(state_object *sm, uint8_t bit){
 static void passcode_clear(state_object *sm){
     sm->passcode = 0;
     sm->bit_index = 7;
+}
+
+static void Flash_LED(led_id led){
+    LED_set(led, LED_ON);
+    k_msleep(100);
+    LED_set(led, LED_OFF);
 }
