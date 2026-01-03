@@ -13,6 +13,9 @@ typedef struct {
     uint8_t passcode;
     int8_t bit_index;
 
+    char string[3]; // two character string, with a 3rd char for \0
+    uint8_t str_len;
+
     uint8_t duty_cycle;
     int8_t direction;
     enum state_machine_states previous_state;
@@ -40,6 +43,9 @@ static void passcode_add_bit(state_object *sm, uint8_t bit);
 static void passcode_clear(state_object *sm);
 static void Flash_LED(led_id led);
 
+static void string_clear(state_object *sm);
+static void append_to_string(state_object *sm, char character, uint8_t index);
+
 /*----------------------------------------------------------
  * Local Variables
  *----------------------------------------------------------*/
@@ -64,6 +70,8 @@ void state_machine_init(void)
                                                                    // and sets first state to be FIRST_STRING
 
     lesson_6_sm.previous_state = FIRST_STRING;
+    string_clear(&lesson_6_sm);
+
 }
 
 int state_machine_run(void)
@@ -76,6 +84,7 @@ int state_machine_run(void)
 static void first_string_entry(void *o){
     state_object *sm = o;
     passcode_clear(sm);
+    string_clear(sm);
     printk("ENTERED FIRST_STRING\n");
     LED_blink(LED3, LED_1HZ);
 
@@ -104,7 +113,8 @@ static enum smf_state_result first_string_run(void *o){
 
     if(BTN_check_clear_pressed(BTN3)){
         if(sm->bit_index<0){
-        smf_set_state(SMF_CTX(sm), &states[SECOND_STRING]);
+            append_to_string(sm, sm->passcode, 0);
+            smf_set_state(SMF_CTX(sm), &states[SECOND_STRING]);
         }
     }
 
@@ -113,8 +123,13 @@ static enum smf_state_result first_string_run(void *o){
 
 // SECOND_STRING FUNCTIONS
 static void second_string_entry(void *o){
+    state_object *sm = o;
+    passcode_clear(sm);
+
     printk("ENTERED SECOND_STRING\n");
     LED_blink(LED3, LED_4HZ);
+
+    printk("string is %s\n", sm->string);
 }
 
 static enum smf_state_result second_string_run(void *o){
@@ -125,15 +140,35 @@ static enum smf_state_result second_string_run(void *o){
         return SMF_EVENT_HANDLED;
     }
 
-    if(BTN_check_clear_pressed(BTN2)){
-        smf_set_state(SMF_CTX(sm), &states[PRINT_STRING]);
+    // Reset entered bits
+    if (BTN_check_clear_pressed(BTN2)) {
+        printk("RESET EVERYTHING\n");
+        passcode_clear(sm);
+        string_clear(sm);
+        smf_set_state(SMF_CTX(sm), &states[FIRST_STRING]);
+        return SMF_EVENT_HANDLED;
+    }
+    
+    if(BTN_check_clear_pressed(BTN0)){          // adds 0 bit to passcode
+        passcode_add_bit(sm, 0);
+    } else if(BTN_check_clear_pressed(BTN1)){   // adds 1 bit to passcode
+        passcode_add_bit(sm, 1);
+    }
+
+    if(BTN_check_clear_pressed(BTN3)){
+        if(sm->bit_index<0){
+            append_to_string(sm, sm->passcode, 1);
+            smf_set_state(SMF_CTX(sm), &states[PRINT_STRING]);
+        }
     }
     return SMF_EVENT_HANDLED;
 }
 
 // PRINT_STRING FUNCTIONS
 static void print_string_entry(void *o){
+    state_object *sm = o;
     printk("ENTERED PRINT_STRING\n");
+    printk("string is %s\n", sm->string);
     LED_blink(LED3, LED_16HZ);
 }
 
@@ -150,8 +185,8 @@ static enum smf_state_result print_string_run(void *o){
     }
 
     if(BTN_check_clear_pressed(BTN3)){
-        //printk("Code is %d \n", );
-        printk("Printed passcode\n");
+        printk("Code is %s \n", sm->string);
+        //printk("Printed passcode\n");
     }
         
     return SMF_EVENT_HANDLED;
@@ -248,4 +283,15 @@ static void Flash_LED(led_id led){
     LED_set(led, LED_ON);
     k_msleep(100);
     LED_set(led, LED_OFF);
+}
+
+static void string_clear(state_object *sm)
+{
+    sm->str_len = 0;
+    sm->string[0] = '\0';
+}
+
+static void append_to_string(state_object *sm, char character, uint8_t index){
+    sm->string[index] = character;
+    sm->string[index+1] = '\0';
 }
