@@ -14,5 +14,5 @@ zephyr_include_directories(src)
 
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE src/state_machine.c)
-target_sources(app PRIVATE ../drivers/BTN/BTN.c)
-target_sources(app PRIVATE ../drivers/LED/LED.c)
+#target_sources(app PRIVATE ../drivers/BTN/BTN.c)
+#target_sources(app PRIVATE ../drivers/LED/LED.c)
