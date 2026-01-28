@@ -13,3 +13,4 @@ zephyr_include_directories(src)
 
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE src/storage_init.c)
+target_sources(app PRIVATE src/wav_parser.c)
