@@ -51,11 +51,20 @@
 	};
 };
 
-/ {
-	ramdisk0 {
-		compatible = "zephyr,ram-disk";
-		disk-name = "RAM";
-		sector-size = <512>;
-		sector-count = <256>;
-	};
+&arduino_spi {
+    status = "okay";
+
+    cs-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+
+    sdhc0: sdhc@0 {
+        compatible = "zephyr,sdhc-spi-slot";
+        reg = <0>;                
+        status = "okay";
+        spi-max-frequency = <8000000>;
+        mmc {
+                    compatible = "zephyr,sdmmc-disk";
+                    disk-name = "SD";
+                    status = "okay";
+                };
+    };
 };

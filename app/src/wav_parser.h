@@ -2,6 +2,7 @@
 #define WAV_PARSE_H
 
 #include <stdint.h>
+#include <sys/types.h>
 
 struct wav_info {
     uint16_t audio_format;     // 1 = PCM
@@ -14,6 +15,6 @@ struct wav_info {
     uint32_t data_size;        // size of PCM data
 };
 
-int parse_wav();
+int parse_wav(const char *path, struct wav_info *info);
 
 #endif
