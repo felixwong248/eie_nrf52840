@@ -3,6 +3,7 @@
 
 #include "storage_init.h"
 #include "wav_parser.h"
+#include "stream_wav_pcm.h"
 
 #define WAV_PATH "/SD:/test.wav"
 
@@ -22,5 +23,11 @@ int main(void)
     rc = parse_wav(WAV_PATH, &info);
     printk("parse_wav rc=%d\n", rc);
 
+    printk("parse_wav OK\n");
+
+    rc = stream_pcm(WAV_PATH, &info);
+    printk("stream_pcm rc=%d\n", rc);
+
+    printk("Done.\n");
     return 0;
 }

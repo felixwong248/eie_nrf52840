@@ -15,6 +15,9 @@ struct wav_info {
     uint32_t data_size;        // size of PCM data
 };
 
+uint16_t u16little_en(const uint8_t *p);
+uint32_t u32little_en(const uint8_t *p);
+
 int parse_wav(const char *path, struct wav_info *info);
 
 #endif
