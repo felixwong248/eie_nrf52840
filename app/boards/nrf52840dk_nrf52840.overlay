@@ -80,18 +80,18 @@
     i2s0_default: i2s0_default {
         group1 {
             psels =
-                <NRF_PSEL(I2S_SCK,  0, 19)>,
-                <NRF_PSEL(I2S_LRCK, 0, 20)>,
-                <NRF_PSEL(I2S_SDOUT,0, 21)>;
+                <NRF_PSEL(I2S_SCK_M,  0, 19)>,
+                <NRF_PSEL(I2S_LRCK_M, 0, 20)>,
+                <NRF_PSEL(I2S_SDOUT,  0, 21)>;
         };
     };
 
     i2s0_sleep: i2s0_sleep {
         group1 {
             psels =
-                <NRF_PSEL(I2S_SCK,  0, 19)>,
-                <NRF_PSEL(I2S_LRCK, 0, 20)>,
-                <NRF_PSEL(I2S_SDOUT,0, 21)>;
+                <NRF_PSEL(I2S_SCK_M,  0, 19)>,
+                <NRF_PSEL(I2S_LRCK_M, 0, 20)>,
+                <NRF_PSEL(I2S_SDOUT,  0, 21)>;
             low-power-enable;
         };
     };
