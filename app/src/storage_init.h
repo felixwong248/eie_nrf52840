@@ -5,5 +5,6 @@
 #define MAX_FILE_AMOUNT 32
 
 int storage_init();
+int file_name_read(char file_names[MAX_FILE_AMOUNT][MAX_LETTER_AMOUNT]);
 
 #endif
