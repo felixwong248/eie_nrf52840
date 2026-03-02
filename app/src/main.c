@@ -1,82 +1,113 @@
-#include <inttypes.h>
-
 #include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
-#include <zephyr/drivers/display.h>
+#include <zephyr/drivers/i2s.h>
+#include <zephyr/sys/printk.h>
+#include <stdint.h>
 
-#include "lvgl.h"
+#define SAMPLE_RATE        48000
+#define CHANNELS           2
+#define WORD_SIZE_BITS     16
 
-#include "BTN.h"
-//#include "lv_data_obj.h"
+#define SAMPLES_PER_BLOCK  256
+#define BLOCK_COUNT        8
 
-#include "storage_init.h"
-#include "wav_parser.h"
-#include "stream_wav_pcm.h"
-//#include "i2s_test.h"
+#define BYTES_PER_SAMPLE   (WORD_SIZE_BITS / 8)
+#define BLOCK_SIZE         (SAMPLES_PER_BLOCK * CHANNELS * BYTES_PER_SAMPLE)
 
-#define WAV_PATH "/SD:/test2.wav"
-#define SLEEP_MS 1
+#define I2S_TIMEOUT_MS     2000
 
-static const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
-static lv_obj_t *screen = NULL;
+K_MEM_SLAB_DEFINE(tx_slab, BLOCK_SIZE, BLOCK_COUNT, 4);
+
+static void fill_block(int16_t *dst, uint32_t *phase)
+{
+    /* 1 kHz square at 48 kHz: toggle every 24 samples */
+    const int16_t HI = 20000;
+    const int16_t LO = -20000;
+
+    for (int i = 0; i < SAMPLES_PER_BLOCK; i++) {
+        int16_t v = ((*phase / 24U) & 1U) ? HI : LO;
+        (*phase)++;
+
+        dst[2 * i]     = v; /* L */
+        dst[2 * i + 1] = v; /* R */
+    }
+}
 
 int main(void)
 {
-    if(!device_is_ready(display_dev)){
-        return 0;
-    }
-    screen = lv_screen_active();
-    if(screen == NULL){
-        return 0;
-    }
-
-    lv_obj_t *label = lv_label_create(screen);
-    lv_label_set_text(label, "Hello World!");
-    display_blanking_off(display_dev);
-    /*
-    int rc;
-    struct wav_info info;
-    
-    int file_count;
-    char file_names[MAX_FILE_AMOUNT][MAX_LETTER_AMOUNT];
-    
-    printk("SD FATFS WAV test start\n");
-
-    rc = storage_init();   // now mounts SD, not RAM
-    if (rc != 0) {
-        printk("storage_init failed rc=%d\n", rc);
+    const struct device *i2s = DEVICE_DT_GET(DT_NODELABEL(i2s0));
+    if (!device_is_ready(i2s)) {
+        printk("I2S not ready\n");
         return 0;
     }
 
-    file_count = file_name_read(file_names);
+    printk("I2S dev: %s\n", i2s->name);
 
-    if (file_count < 0) {
-        printk("file_name_read failed\n");
-        return 0;
+    struct i2s_config cfg = {0};
+    cfg.word_size      = WORD_SIZE_BITS;
+    cfg.channels       = CHANNELS;
+    cfg.format = I2S_FMT_DATA_FORMAT_I2S | I2S_FMT_CLK_IF_NB;
+    cfg.frame_clk_freq = SAMPLE_RATE;
+    cfg.block_size     = BLOCK_SIZE;
+    cfg.mem_slab       = &tx_slab;
+    cfg.options        = I2S_OPT_FRAME_CLK_MASTER | I2S_OPT_BIT_CLK_MASTER;
+    cfg.timeout        = I2S_TIMEOUT_MS;
+
+    int ret = i2s_configure(i2s, I2S_DIR_TX, &cfg);
+    printk("i2s_configure ret=%d\n", ret);
+    if (ret) return 0;
+
+    uint32_t phase = 0;
+
+    /* Prime TX queue */
+    for (int n = 0; n < 4; n++) {
+        void *block = NULL;
+        ret = k_mem_slab_alloc(&tx_slab, &block, K_FOREVER);
+        if (ret) {
+            printk("slab_alloc prime ret=%d\n", ret);
+            return 0;
+        }
+
+        fill_block((int16_t *)block, &phase);
+
+        ret = i2s_write(i2s, block, BLOCK_SIZE);
+        printk("i2s_write(prime)[%d] ret=%d\n", n, ret);
+        if (ret) return 0;
     }
 
-    printk("\nFiles found on SD card:\n");
-    printk("------------------------\n");
+    ret = i2s_trigger(i2s, I2S_DIR_TX, I2S_TRIGGER_START);
+    printk("i2s_start ret=%d\n", ret);
+    if (ret) return 0;
 
-    for (int i = 0; i < file_count; i++) {
-        printk("%d: %s\n", i, file_names[i]);
-    }
+    printk("RUNNING. BCK=P0.11 LRCK=P0.12 SDOUT=P0.10\n");
 
-    printk("------------------------\n");
+    while (1) {
+        /* 1) Allocate + fill a new TX block */
+        void *block = NULL;
+        ret = k_mem_slab_alloc(&tx_slab, &block, K_FOREVER);
+        if (ret) {
+            continue;
+        }
 
-    printk("Done listing files.\n");
+        fill_block((int16_t *)block, &phase);
 
-    rc = parse_wav(WAV_PATH, &info);
-    printk("parse_wav rc=%d\n", rc);
+        /* 2) Queue it (this should now block up to timeout instead of -35 spam) */
+        ret = i2s_write(i2s, block, BLOCK_SIZE);
+        if (ret) {
+            printk("i2s_write ret=%d\n", ret);
+            k_mem_slab_free(&tx_slab, block);
+            k_msleep(5);
+            continue;
+        }
 
-    rc = stream_pcm(WAV_PATH, &info);
-    printk("stream_pcm rc=%d\n", rc);
-    
-    printk("Done.\n");
-    */
-    while(1) {
-        lv_timer_handler();
-        k_msleep(SLEEP_MS);
+        /* 3) Reclaim ONE completed TX block and free it back to the slab */
+        void *released = NULL;
+        size_t released_size = 0;
+
+        ret = i2s_read(i2s, &released, &released_size);
+        if (ret == 0 && released != NULL) {
+            k_mem_slab_free(&tx_slab, released);
+        }
+        /* If ret != 0, no completed block ready yet — that's ok. */
     }
 }
