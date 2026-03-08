@@ -31,4 +31,6 @@ bool BTN_check_pressed(btn_id btn);
 
 void BTN_clear_pressed(btn_id btn);
 
+int BTN_init_selected(btn_id btn);
+
 #endif

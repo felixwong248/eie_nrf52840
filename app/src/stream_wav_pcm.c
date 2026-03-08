@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "stream_wav_pcm.h"
+#include "wav_parser.h"
 
 #define I2S_BLOCK_SIZE   2048
 #define I2S_BLOCK_COUNT  8
@@ -207,4 +208,25 @@ out:
     i2s_stop_tx();
     printk("stream_pcm(): exit rc=%d\n", rc);
     return rc;
+}
+
+
+int play_current_file(const char *path, struct wav_info *info)
+{
+    int rc;
+    printk("Playing: %s\n", path);
+
+    rc = parse_wav(path, info);
+    printk("parse_wav rc=%d\n", rc);
+    if (rc != 0) {
+        return rc;
+    }
+
+    rc = stream_pcm(path, info);
+    printk("stream_pcm rc=%d\n", rc);
+    if (rc != 0) {
+        return rc;
+    }
+
+    return 0;
 }

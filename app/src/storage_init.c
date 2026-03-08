@@ -81,7 +81,7 @@ int file_name_read(char file_names[MAX_FILE_AMOUNT][MAX_LETTER_AMOUNT])
         strncpy(file_names[file_amount], entry.name, MAX_LETTER_AMOUNT - 1);
         file_names[file_amount][MAX_LETTER_AMOUNT - 1] = '\0';
 
-        printk("Stored file: %s\n", file_names[file_amount]);
+        //printk("Stored file: %s\n", file_names[file_amount]);
 
         file_amount++;
     }
@@ -89,4 +89,9 @@ int file_name_read(char file_names[MAX_FILE_AMOUNT][MAX_LETTER_AMOUNT])
     fs_closedir(&directory);
 
     return file_amount;   // return how many files were stored
+}
+
+void build_wav_path(char *dest, size_t dest_size, const char *filename)
+{
+    snprintf(dest, dest_size, "%s/%s", MOUNT_POINT, filename);
 }

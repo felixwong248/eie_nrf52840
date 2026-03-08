@@ -6,5 +6,6 @@
 
 int storage_init();
 int file_name_read(char file_names[MAX_FILE_AMOUNT][MAX_LETTER_AMOUNT]);
+void build_wav_path(char *dest, size_t dest_size, const char *filename);
 
 #endif

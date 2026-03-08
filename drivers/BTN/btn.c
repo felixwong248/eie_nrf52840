@@ -33,6 +33,7 @@ typedef struct btn_gpio_t {
   volatile bool pressed;
   struct gpio_callback cb;
   struct k_work_delayable work;
+  bool initialized;
 } btn_gpio;
 
 /* ----------------------------------------------------------------------------
@@ -47,10 +48,10 @@ static void _btn_debounce(struct k_work *work);
 /* ----------------------------------------------------------------------------
                                 Global States
 ---------------------------------------------------------------------------- */
-static btn_gpio _btn0 = {.spec=GPIO_DT_SPEC_GET(BTN0_NODE, gpios), .pressed=false};
-static btn_gpio _btn1 = {.spec=GPIO_DT_SPEC_GET(BTN1_NODE, gpios), .pressed=false};
-static btn_gpio _btn2 = {.spec=GPIO_DT_SPEC_GET(BTN2_NODE, gpios), .pressed=false};
-static btn_gpio _btn3 = {.spec=GPIO_DT_SPEC_GET(BTN3_NODE, gpios), .pressed=false};
+static btn_gpio _btn0 = {.spec=GPIO_DT_SPEC_GET(BTN0_NODE, gpios), .pressed=false, .initialized=false};
+static btn_gpio _btn1 = {.spec=GPIO_DT_SPEC_GET(BTN1_NODE, gpios), .pressed=false, .initialized=false};
+static btn_gpio _btn2 = {.spec=GPIO_DT_SPEC_GET(BTN2_NODE, gpios), .pressed=false, .initialized=false};
+static btn_gpio _btn3 = {.spec=GPIO_DT_SPEC_GET(BTN3_NODE, gpios), .pressed=false, .initialized=false};
 static btn_gpio *_btns[NUM_BTNS] = {&_btn0, &_btn1, &_btn2, &_btn3};
 
 /* ----------------------------------------------------------------------------
@@ -64,34 +65,41 @@ static btn_gpio *_btns[NUM_BTNS] = {&_btn0, &_btn1, &_btn2, &_btn3};
  * @return Error code, < 0 on failures
  */
 static int _btn_config(btn_gpio *btn) {
+  if (btn->initialized) {
+    return 0;
+  }
+
   if (!gpio_is_ready_dt(&btn->spec)) {
-		return -EIO;
-	} else if (0 > gpio_pin_configure_dt(&btn->spec, GPIO_INPUT)) {
-		return -EIO;
+    return -EIO;
+  } else if (0 > gpio_pin_configure_dt(&btn->spec, GPIO_INPUT)) {
+    return -EIO;
   } else if (0 > gpio_pin_interrupt_configure_dt(&btn->spec, GPIO_INT_EDGE_TO_ACTIVE)) {
-		return -EIO;
+    return -EIO;
   } else {
     gpio_init_callback(&btn->cb, _btn_interrupt_service_routine, BIT(btn->spec.pin));
     gpio_add_callback(btn->spec.port, &btn->cb);
     k_work_init_delayable(&btn->work, _btn_debounce);
+    btn->initialized = true;
     return 0;
   }
 }
 
 /**
- * @brief Invoked as an interrupt when a button goes to the active state (high)
+ * @brief Invoked as an interrupt when a button goes to the active state
  * 
  * @param [in] dev The GPIO port that triggered the interrupt
  * @param [in] cb A pointer to the registered callback structure for this ISR
  * @param [in] pins A bitmask for all the GPIO pins that triggered this interrupt
  */
 static void _btn_interrupt_service_routine(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+  ARG_UNUSED(dev);
+  ARG_UNUSED(cb);
+
   for (uint8_t i = 0; i < NUM_BTNS; i++) {
-    if (pins & BIT(_btns[i]->spec.pin)) {
+    if (_btns[i]->initialized && (pins & BIT(_btns[i]->spec.pin))) {
       k_work_reschedule(&_btns[i]->work, K_MSEC(BTN_DEBOUNCE_MS));
     }
   }
-  return;
 }
 
 /**
@@ -127,6 +135,21 @@ int BTN_init() {
 }
 
 /**
+ * @brief Init only one selected button
+ * 
+ * @param [in] btn Which button to initialize
+ * 
+ * @return Error code, < 0 on failures
+ */
+int BTN_init_selected(btn_id btn) {
+  if (IS_INVALID_BTN(btn)) {
+    return -EINVAL;
+  }
+
+  return _btn_config(_btns[btn]);
+}
+
+/**
  * @brief Checks if the given button is currently being pressed
  * 
  * @param [in] btn Which button to check
@@ -134,7 +157,7 @@ int BTN_init() {
  * @return true if btn is being pressed
  */
 bool BTN_is_pressed(btn_id btn) {
-  if (IS_INVALID_BTN(btn)) {
+  if (IS_INVALID_BTN(btn) || !_btns[btn]->initialized) {
     return false;
   } else if (0 < gpio_pin_get_dt(&_btns[btn]->spec)) {
     return true;
@@ -152,7 +175,7 @@ bool BTN_is_pressed(btn_id btn) {
  * @return true if btn has been pressed
  */
 bool BTN_check_clear_pressed(btn_id btn) {
-  if (IS_INVALID_BTN(btn)) {
+  if (IS_INVALID_BTN(btn) || !_btns[btn]->initialized) {
     return false;
   } else {
     bool was_pressed = _btns[btn]->pressed;
@@ -169,7 +192,7 @@ bool BTN_check_clear_pressed(btn_id btn) {
  * @return true if btn has been pressed
  */
 bool BTN_check_pressed(btn_id btn) {
-  if (IS_INVALID_BTN(btn)) {
+  if (IS_INVALID_BTN(btn) || !_btns[btn]->initialized) {
     return false;
   } else {
     return _btns[btn]->pressed;
@@ -182,7 +205,7 @@ bool BTN_check_pressed(btn_id btn) {
  * @param [in] btn Which button to clear
  */
 void BTN_clear_pressed(btn_id btn) {
-  if (IS_INVALID_BTN(btn)) {
+  if (IS_INVALID_BTN(btn) || !_btns[btn]->initialized) {
     return;
   } else {
     _btns[btn]->pressed = false;
