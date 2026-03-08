@@ -22,6 +22,9 @@
 #define I2S_BLOCK_COUNT  8    // 8 memory blocks for buffering for i2s
 K_MEM_SLAB_DEFINE(i2s_slab, I2S_BLOCK_SIZE, I2S_BLOCK_COUNT, 4);
 
+static bool i2s_is_configured = false;
+static uint32_t configured_sample_rate = 0;
+
 static const struct device *i2s_dev = DEVICE_DT_GET(DT_NODELABEL(i2s0));
 
 static int i2s_config_tx(uint32_t sample_rate_hz)
@@ -62,8 +65,10 @@ static inline void reclaim_mem_block(void)
 
 static void i2s_stop_tx(void)
 {
-    (void)i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
-    (void)i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_STOP);
+    int rc;
+
+    rc = i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
+    printk("i2s_stop_tx(): DRAIN rc=%d\n", rc);
 
     for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
         reclaim_mem_block();
@@ -72,10 +77,17 @@ static void i2s_stop_tx(void)
 
 int stream_pcm(const char *path, const struct wav_info *info)
 {
-    int rc = i2s_config_tx(info->sample_rate); // configures i2s to wav sample right
-    if (rc) {
-        printk("stream_pcm(): i2s_config_tx failed rc=%d\n", rc);
-        return rc;
+    int rc;
+
+    if (!i2s_is_configured || configured_sample_rate != info->sample_rate) {
+        rc = i2s_config_tx(info->sample_rate);
+        if (rc) {
+            printk("stream_pcm(): i2s_config_tx failed rc=%d\n", rc);
+            return rc;
+        }
+
+        i2s_is_configured = true;
+        configured_sample_rate = info->sample_rate;
     }
 
     struct fs_file_t f;

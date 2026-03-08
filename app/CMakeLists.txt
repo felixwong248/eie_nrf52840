@@ -9,12 +9,16 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(app LANGUAGES C)
 
-zephyr_include_directories(src)
-
+zephyr_include_directories(
+    src
+    src/Storage
+    src/Audio
+    src/Playback_controls
+)
 target_sources(app PRIVATE src/main.c)
-target_sources(app PRIVATE src/storage_init.c)
-target_sources(app PRIVATE src/wav_parser.c)
-target_sources(app PRIVATE src/stream_wav_pcm.c)
+target_sources(app PRIVATE src/Storage/storage_init.c)
+target_sources(app PRIVATE src/Audio/wav_parser.c)
+target_sources(app PRIVATE src/Audio/stream_wav_pcm.c)
 target_sources(app PRIVATE src/global_variables.c)
-target_sources(app PRIVATE src/button_control.c)
-target_sources(app PRIVATE src/player_controls.c)
+target_sources(app PRIVATE src/Playback_controls/button_control.c)
+target_sources(app PRIVATE src/Playback_controls/player_controls.c)
