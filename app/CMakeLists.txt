@@ -14,6 +14,7 @@ zephyr_include_directories(
     src/Storage
     src/Audio
     src/Playback_controls
+    src/Display
 )
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE src/Storage/storage_init.c)

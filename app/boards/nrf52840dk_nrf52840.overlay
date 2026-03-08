@@ -25,13 +25,13 @@
         pwm-led2 = &pwm_led2;
         pwm-led3 = &pwm_led3;
     };
-     zephyr,user {
+    zephyr,user {
         dcx-gpios = <&gpio1 11 GPIO_ACTIVE_HIGH>;
     };
 
-    //arduino_spi {
-    //    cs-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
-    //};
+    arduino_spi {
+        cs-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+    };
 };
 
 &pinctrl { 
@@ -100,25 +100,6 @@
 };
 
 
-/* 
-&arduino_spi {
-    status = "okay";
-
-    cs-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
-
-    sdhc0: sdhc@0 {
-        compatible = "zephyr,sdhc-spi-slot";
-        reg = <0>;                
-        status = "okay";
-        spi-max-frequency = <8000000>;
-        mmc {
-                    compatible = "zephyr,sdmmc-disk";
-                    disk-name = "SD";
-                    status = "okay";
-                };
-    };
-};
-*/
 &i2s0 {
     status = "okay";
     pinctrl-0 = <&i2s0_default>;
