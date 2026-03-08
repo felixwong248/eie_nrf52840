@@ -41,16 +41,16 @@ static int i2s_config_tx_stereo_16(uint32_t sample_rate_hz)
         return -ENODEV;
     }
 
-    struct i2s_config cfg = {0};
-
-    cfg.word_size      = 16;
-    cfg.channels       = 2;
-    cfg.format         = I2S_FMT_DATA_FORMAT_I2S | I2S_FMT_DATA_ORDER_MSB;
-    cfg.options        = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER;
-    cfg.frame_clk_freq = sample_rate_hz;
-    cfg.block_size     = I2S_BLOCK_SIZE;
-    cfg.mem_slab       = &i2s_slab;
-    cfg.timeout        = I2S_TIMEOUT_MS;
+    struct i2s_config cfg = {
+    .word_size      = 16,
+    .channels       = 2,
+    .format         = I2S_FMT_DATA_FORMAT_I2S | I2S_FMT_DATA_ORDER_MSB,
+    .options        = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER,
+    .frame_clk_freq = sample_rate_hz,
+    .block_size     = I2S_BLOCK_SIZE,
+    .mem_slab       = &i2s_slab,
+    .timeout        = I2S_TIMEOUT_MS
+    };
 
     int rc = i2s_configure(i2s_dev, I2S_DIR_TX, &cfg);
     if (rc) {

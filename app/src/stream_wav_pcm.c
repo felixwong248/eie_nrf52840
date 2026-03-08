@@ -10,11 +10,16 @@
 
 #include "stream_wav_pcm.h"
 #include "wav_parser.h"
+#include "global_variables.h"
 
-#define I2S_BLOCK_SIZE   2048
-#define I2S_BLOCK_COUNT  8
+
 #define I2S_TIMEOUT_MS   2000
 
+// I2s needs fixed sized memory blocks (all considered a slab) when that are dedicated to i2s 
+// better than malloc because easier and faster to allocate memory which is needed for audio.
+// You want multiple memory blocks so that you can stream and process data at the same time
+#define I2S_BLOCK_SIZE   2048 // fill chunks of 2048 bytes
+#define I2S_BLOCK_COUNT  8    // 8 memory blocks for buffering for i2s
 K_MEM_SLAB_DEFINE(i2s_slab, I2S_BLOCK_SIZE, I2S_BLOCK_COUNT, 4);
 
 static const struct device *i2s_dev = DEVICE_DT_GET(DT_NODELABEL(i2s0));
@@ -26,29 +31,29 @@ static int i2s_config_tx(uint32_t sample_rate_hz)
         return -ENODEV;
     }
 
-    struct i2s_config cfg = {0};
-    cfg.word_size      = 16;
-    cfg.channels       = 2;
-
-    /* Match your WORKING demo exactly */
-    cfg.format         = I2S_FMT_DATA_FORMAT_LEFT_JUSTIFIED;
-
-    cfg.options        = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER;
-    cfg.frame_clk_freq = sample_rate_hz;
-    cfg.block_size     = I2S_BLOCK_SIZE;
-    cfg.mem_slab       = &i2s_slab;
-    cfg.timeout        = I2S_TIMEOUT_MS;
+    struct i2s_config cfg = {
+        .word_size      = 16, // 16 bit stereo audio
+        .channels       = 2,  // 2 channels, L and R
+        .format         = I2S_FMT_DATA_FORMAT_LEFT_JUSTIFIED, // board kept outputting in left Jus even in standard philips i2s
+        .options        = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER, // board generates bit clk for dac
+        .frame_clk_freq = sample_rate_hz, // play back speed matches the sample rate of the wav file
+        .block_size     = I2S_BLOCK_SIZE,
+        .mem_slab       = &i2s_slab,
+        .timeout        = I2S_TIMEOUT_MS
+    };
 
     int rc = i2s_configure(i2s_dev, I2S_DIR_TX, &cfg);
     printk("i2s_configure rc=%d\n", rc);
+    
     return rc;
 }
 
-static inline void reclaim_one(void)
+static inline void reclaim_mem_block(void)
 {
     void *released = NULL;
     size_t released_size = 0;
 
+    // i2s_read checks if any blocks are free, and if yes, free the block
     int rc = i2s_read(i2s_dev, &released, &released_size);
     if (rc == 0 && released != NULL) {
         k_mem_slab_free(&i2s_slab, released);
@@ -60,27 +65,14 @@ static void i2s_stop_tx(void)
     (void)i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
     (void)i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_STOP);
 
-    /* best-effort reclaim */
     for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-        reclaim_one();
+        reclaim_mem_block();
     }
 }
 
 int stream_pcm(const char *path, const struct wav_info *info)
 {
-    printk("stream_pcm(): enter\n");
-
-    printk("stream_pcm(): WAV fmt=%u ch=%u fs=%u bits=%u align=%u off=%lld size=%u\n",
-           info->audio_format, info->num_channels, info->sample_rate,
-           info->bits_per_sample, info->block_align,
-           (long long)info->data_offset, info->data_size);
-
-    if (info->audio_format != 1 || info->bits_per_sample != 16 || info->num_channels != 2) {
-        printk("stream_pcm(): unsupported WAV\n");
-        return -ENOTSUP;
-    }
-
-    int rc = i2s_config_tx(info->sample_rate);
+    int rc = i2s_config_tx(info->sample_rate); // configures i2s to wav sample right
     if (rc) {
         printk("stream_pcm(): i2s_config_tx failed rc=%d\n", rc);
         return rc;
@@ -89,13 +81,13 @@ int stream_pcm(const char *path, const struct wav_info *info)
     struct fs_file_t f;
     fs_file_t_init(&f);
 
-    printk("stream_pcm(): fs_open(%s)\n", path);
     rc = fs_open(&f, path, FS_O_READ);
     printk("stream_pcm(): fs_open rc=%d\n", rc);
-    if (rc < 0) return rc;
+    if (rc < 0){
+        return rc;
+    }
 
-    printk("stream_pcm(): fs_seek data_offset=%lld\n", (long long)info->data_offset);
-    rc = fs_seek(&f, info->data_offset, FS_SEEK_SET);
+    rc = fs_seek(&f, info->data_offset, FS_SEEK_SET); // skips the formatting chunks and goes to data chunks
     printk("stream_pcm(): fs_seek rc=%d\n", rc);
     if (rc < 0) {
         fs_close(&f);
@@ -103,36 +95,36 @@ int stream_pcm(const char *path, const struct wav_info *info)
     }
 
     size_t bytes_left = info->data_size;
-
-    /* PRIME QUEUE BEFORE START (like your working demo) */
-    printk("stream_pcm(): priming...\n");
-    for (int n = 0; n < (I2S_BLOCK_COUNT / 2) && bytes_left > 0; n++) {
+    for (int n = 0; n < (I2S_BLOCK_COUNT / 2) && bytes_left > 0; n++) { // prime memory blocks with data to prevent delays
         void *block = NULL;
 
-        rc = k_mem_slab_alloc(&i2s_slab, &block, K_FOREVER);
+        rc = k_mem_slab_alloc(&i2s_slab, &block, K_FOREVER); // allocates a free mem block
         if (rc) {
             printk("stream_pcm(): slab alloc prime rc=%d\n", rc);
             rc = -ENOMEM;
             goto out;
         }
 
-        size_t want = MIN(bytes_left, (size_t)I2S_BLOCK_SIZE);
-        want -= (want % info->block_align);
-        if (want == 0) {
+        // read size takes the smaller value of the block size or how ever many bytes are left
+        // and then rounds it down so its a multiple of block align so you don't have half an audio frame
+        size_t read_size = MIN(bytes_left, (size_t)I2S_BLOCK_SIZE);
+        read_size -= (read_size % info->block_align);
+        if (read_size == 0) {
             k_mem_slab_free(&i2s_slab, block);
             break;
         }
 
-        ssize_t r = fs_read(&f, block, want);
+        ssize_t r = fs_read(&f, block, read_size);
         if (r <= 0) {
-            printk("stream_pcm(): fs_read(prime) r=%d\n", (int)r);
+            printk("stream_pcm(): fs_read(prime mem blocks) r=%d\n", (int)r);
             k_mem_slab_free(&i2s_slab, block);
             rc = -EIO;
             goto out;
         }
 
+        // fills the rest of the block with 0s if theres less bytes read than the 2048 block size
         if ((size_t)r < I2S_BLOCK_SIZE) {
-            memset((uint8_t *)block + (size_t)r, 0, I2S_BLOCK_SIZE - (size_t)r);
+            memset((uint8_t *)block + (size_t)r, 0, I2S_BLOCK_SIZE - (size_t)r); 
         }
 
         bytes_left -= (size_t)r;
@@ -148,17 +140,24 @@ int stream_pcm(const char *path, const struct wav_info *info)
     printk("stream_pcm(): START\n");
     rc = i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_START);
     printk("stream_pcm(): i2s_trigger(START) rc=%d\n", rc);
-    if (rc) goto out;
-
+    if (rc) {
+        goto out;
+    }
     printk("stream_pcm(): streaming loop...\n");
 
-    uint32_t blocks = 0;
+    uint32_t blocks_sent = 0;
 
     while (bytes_left > 0) {
+
+        if (g_next_requested || g_prev_requested || g_stop_requested) {
+        printk("stream_pcm(): stop/skip requested\n");
+        rc = 0;
+        break;
+        }
         void *block = NULL;
 
-        /* keep slab healthy */
-        reclaim_one();
+
+        reclaim_mem_block();
 
         rc = k_mem_slab_alloc(&i2s_slab, &block, K_FOREVER);
         if (rc) {
@@ -167,14 +166,14 @@ int stream_pcm(const char *path, const struct wav_info *info)
             break;
         }
 
-        size_t want = MIN(bytes_left, (size_t)I2S_BLOCK_SIZE);
-        want -= (want % info->block_align);
-        if (want == 0) {
+        size_t read_size = MIN(bytes_left, (size_t)I2S_BLOCK_SIZE);
+        read_size -= (read_size % info->block_align);
+        if (read_size == 0) {
             k_mem_slab_free(&i2s_slab, block);
             break;
         }
 
-        ssize_t r = fs_read(&f, block, want);
+        ssize_t r = fs_read(&f, block, read_size);
         if (r <= 0) {
             printk("stream_pcm(): fs_read(loop) r=%d\n", (int)r);
             k_mem_slab_free(&i2s_slab, block);
@@ -195,10 +194,9 @@ int stream_pcm(const char *path, const struct wav_info *info)
             break;
         }
 
-        blocks++;
-        if ((blocks % 50) == 0) {
-            printk("stream_pcm(): blocks=%u bytes_left=%u\n",
-                   (unsigned)blocks, (unsigned)bytes_left);
+        blocks_sent++;
+        if ((blocks_sent % 1000) == 0) {
+            printk("stream_pcm(): blocks_sent=%u bytes_left=%u\n", blocks_sent, bytes_left);
         }
     }
 
@@ -210,11 +208,9 @@ out:
     return rc;
 }
 
-
 int play_current_file(const char *path, struct wav_info *info)
 {
     int rc;
-    printk("Playing: %s\n", path);
 
     rc = parse_wav(path, info);
     printk("parse_wav rc=%d\n", rc);
