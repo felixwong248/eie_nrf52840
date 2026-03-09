@@ -6,7 +6,7 @@
 #include "storage_init.h"
 #include "button_control.h"
 #include "player_controls.h"
-#include "ui.h"
+#include "old_ui.h"
 
 int main(void)
 {
@@ -29,23 +29,23 @@ int main(void)
         printk("button_control_init failed rc=%d\n", rc);
         return 0;
     }
-    
+    /*
     rc = ui_init();
     if (rc != 0) {
         printk("ui_init failed rc=%d\n", rc);
         return 0;
     }
 
-    rc = ui_show_first_song();
+    rc = ui_show_song_list();
     if (rc != 0) {
         printk("ui_show_first_song failed rc=%d\n", rc);
     }
-    
-    player_control_run();
+    */
+    player_control_start();
 
     while (1) {
-        lv_task_handler();
-        k_sleep(K_MSEC(10));
+        lv_timer_handler();
+        k_sleep(K_MSEC(1));
     }
 
     return 0;

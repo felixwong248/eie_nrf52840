@@ -2,6 +2,6 @@
 #define PLAYER_H
 
 int player_control_init(void);
-void player_control_run(void);
+int player_control_start(void);
 
 #endif

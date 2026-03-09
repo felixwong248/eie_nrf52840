@@ -7,22 +7,26 @@
 #include "stream_wav_pcm.h"
 #include "global_variables.h"
 
+#define PLAYER_THREAD_STACK_SIZE 4096
+#define PLAYER_THREAD_PRIORITY   5
+
 static int file_count = 0;
 static int current_file_index = 0;
 static char file_names[MAX_FILE_AMOUNT][MAX_LETTER_AMOUNT];
 static char current_path[128];
 static struct wav_info info;
 
-// function increments file index to the next song
+K_THREAD_STACK_DEFINE(player_thread_stack, PLAYER_THREAD_STACK_SIZE);
+static struct k_thread player_thread_data;
+
 static void player_next(void)
 {
     current_file_index++;
     if (current_file_index >= file_count) {
-        current_file_index = 0; // cycles back to index 0
+        current_file_index = 0;
     }
 }
 
-// function decrements file index
 static void player_prev(void)
 {
     if (current_file_index == 0) {
@@ -32,9 +36,42 @@ static void player_prev(void)
     }
 }
 
+static void player_thread(void *p1, void *p2, void *p3)
+{
+    int rc;
+
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    while (1) {
+        build_wav_path(current_path, sizeof(current_path), file_names[current_file_index]);
+        printk("Playing file: %s\n", current_path);
+
+        g_next_requested = false;
+        g_prev_requested = false;
+        g_stop_requested = false;
+
+        rc = play_current_file(current_path, &info);
+        printk("play_current_file rc=%d\n", rc);
+
+        if (g_next_requested) {
+            player_next();
+        } else if (g_prev_requested) {
+            player_prev();
+        } else if (g_stop_requested) {
+            printk("Playback stopped\n");
+        } else {
+            player_next();
+        }
+
+        k_sleep(K_MSEC(10));
+    }
+}
+
 int player_control_init(void)
 {
-    file_count = file_name_read(file_names); // gets # of files
+    file_count = file_name_read(file_names);
 
     if (file_count < 0) {
         printk("file_name_read failed\n");
@@ -49,9 +86,6 @@ int player_control_init(void)
     printk("\nFiles found on SD card:\n");
     printk("------------------------\n");
 
-    build_wav_path(current_path, sizeof(current_path), file_names[current_file_index]);
-
-    // lists the files in the sd card
     for (int i = 0; i < file_count; i++) {
         printk("%d: %s\n", i, file_names[i]);
     }
@@ -62,36 +96,16 @@ int player_control_init(void)
     return 0;
 }
 
-void player_control_run(void)
+int player_control_start(void)
 {
-    int rc;
+    k_thread_create(&player_thread_data,
+                    player_thread_stack,
+                    K_THREAD_STACK_SIZEOF(player_thread_stack),
+                    player_thread,
+                    NULL, NULL, NULL,
+                    PLAYER_THREAD_PRIORITY,
+                    0,
+                    K_NO_WAIT);
 
-    while (1)
-    {
-        build_wav_path(current_path, sizeof(current_path), file_names[current_file_index]);
-        printk("Playing file: %s\n", current_path);
-
-        g_next_requested = false;
-        g_prev_requested = false;
-        g_stop_requested = false;
-
-        rc = play_current_file(current_path, &info);
-        printk("play_current_file rc=%d\n", rc);
-
-        if (g_next_requested) {
-            player_next();
-        }
-        else if (g_prev_requested) {
-            player_prev();
-        }
-        else if (g_stop_requested) {
-            printk("Playback stopped\n");
-        }
-        else {
-
-            player_next(); // goes to next song if no flags become true when the play_current_file returns
-        }
-
-        k_sleep(K_MSEC(10));
-    }
+    return 0;
 }
