@@ -63,15 +63,16 @@ static inline void reclaim_mem_block(void)
     }
 }
 
-static void i2s_stop_tx(void)
+static void i2s_stop_tx(bool error_path)
 {
     int rc;
 
-    rc = i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
-    printk("i2s_stop_tx(): DRAIN rc=%d\n", rc);
-
-    for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-        reclaim_mem_block();
+    if (error_path) {
+        rc = i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DROP);
+        printk("i2s_stop_tx(): DROP rc=%d\n", rc);
+    } else {
+        rc = i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
+        printk("i2s_stop_tx(): DRAIN rc=%d\n", rc);
     }
 }
 
@@ -215,8 +216,13 @@ int stream_pcm(const char *path, const struct wav_info *info)
 out:
     printk("stream_pcm(): stopping rc=%d\n", rc);
     fs_close(&f);
-    i2s_stop_tx();
+    i2s_stop_tx(rc!=0);
     printk("stream_pcm(): exit rc=%d\n", rc);
+
+    if (rc != 0) {
+    i2s_is_configured = false;
+    configured_sample_rate = 0;
+}
     return rc;
 }
 

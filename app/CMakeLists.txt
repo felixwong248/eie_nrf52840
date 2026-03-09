@@ -23,4 +23,13 @@ target_sources(app PRIVATE src/Audio/stream_wav_pcm.c)
 target_sources(app PRIVATE src/global_variables.c)
 target_sources(app PRIVATE src/Playback_controls/button_control.c)
 target_sources(app PRIVATE src/Playback_controls/player_controls.c)
-#target_sources(app PRIVATE src/display/ui.c)
+
+target_sources(app PRIVATE 
+              src/display/ui.c
+              src/display/images.c
+              src/display/screens.c
+              src/display/styles.c
+              src/display/actions.c
+              src/display/ui_image_eie_logo.c
+              src/display/ui_image_play_button.c
+              )

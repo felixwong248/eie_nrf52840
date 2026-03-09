@@ -8,7 +8,7 @@
 #include "global_variables.h"
 
 #define PLAYER_THREAD_STACK_SIZE 4096
-#define PLAYER_THREAD_PRIORITY   5
+#define PLAYER_THREAD_PRIORITY   2
 
 static int file_count = 0;
 static int current_file_index = 0;
@@ -53,22 +53,29 @@ static void player_thread(void *p1, void *p2, void *p3)
         g_stop_requested = false;
 
         rc = play_current_file(current_path, &info);
-        printk("play_current_file rc=%d\n", rc);
+        printk("play_current_file rc=%d next=%d prev=%d stop=%d\n",
+            rc, g_next_requested, g_prev_requested, g_stop_requested);
 
         if (g_next_requested) {
-            player_next();
-        } else if (g_prev_requested) {
-            player_prev();
-        } else if (g_stop_requested) {
-            printk("Playback stopped\n");
-        } else {
+            printk("reason: next requested\n");
             player_next();
         }
-
-        k_sleep(K_MSEC(10));
+        else if (g_prev_requested) {
+            printk("reason: prev requested\n");
+            player_prev();
+        }
+        else if (g_stop_requested) {
+            printk("reason: stop requested\n");
+        }
+        else if (rc == 0) {
+            printk("reason: normal end of song\n");
+            player_next();
+        } else {
+        printk("Playback error, staying on current file\n");
+        k_sleep(K_MSEC(200));
+        }
     }
 }
-
 int player_control_init(void)
 {
     file_count = file_name_read(file_names);

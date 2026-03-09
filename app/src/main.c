@@ -6,11 +6,18 @@
 #include "storage_init.h"
 #include "button_control.h"
 #include "player_controls.h"
-#include "old_ui.h"
+#include "ui.h"
+#include "actions.h"
 
 int main(void)
 {
     int rc;
+    const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
+
+    if (!device_is_ready(display_dev)) {
+        printk("Display device not ready\n");
+        return 0;
+    }
 
     rc = storage_init();
     if (rc != 0) {
@@ -29,23 +36,18 @@ int main(void)
         printk("button_control_init failed rc=%d\n", rc);
         return 0;
     }
-    /*
-    rc = ui_init();
-    if (rc != 0) {
-        printk("ui_init failed rc=%d\n", rc);
-        return 0;
-    }
 
-    rc = ui_show_song_list();
-    if (rc != 0) {
-        printk("ui_show_first_song failed rc=%d\n", rc);
-    }
-    */
+    ui_init();
+    display_blanking_off(display_dev);
+    load_song_menu();
+    
     player_control_start();
 
     while (1) {
         lv_timer_handler();
+        ui_tick();
         k_sleep(K_MSEC(1));
+        
     }
 
     return 0;
