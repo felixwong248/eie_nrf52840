@@ -121,11 +121,31 @@ void create_screen_list_page() {
             lv_obj_set_style_text_font(obj, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
         }
         {
+            // border select
+            lv_obj_t *obj = lv_obj_create(parent_obj);
+            objects.border_select = obj;
+            lv_obj_set_pos(obj, 35, 63);
+            lv_obj_set_size(obj, 250, 36);
+            lv_obj_set_style_bg_color(obj, lv_color_hex(0xfffcfcfc), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_opa(obj, 70, LV_PART_MAIN | LV_STATE_DEFAULT);
+        }
+        {
+            // Play_button
             lv_obj_t *obj = lv_image_create(parent_obj);
+            objects.play_button = obj;
             lv_obj_set_pos(obj, 270, 188);
             lv_obj_set_size(obj, 50, 52);
             lv_image_set_src(obj, &img_play_button);
-            lv_image_set_scale(obj, 65);
+            lv_image_set_scale(obj, 120);
+        }
+        {
+            // Pause button
+            lv_obj_t *obj = lv_image_create(parent_obj);
+            objects.pause_button = obj;
+            lv_obj_set_pos(obj, 270, 188);
+            lv_obj_set_size(obj, 50, 50);
+            lv_image_set_src(obj, &img_pause_button);
+            lv_image_set_scale(obj, 125);
         }
     }
     

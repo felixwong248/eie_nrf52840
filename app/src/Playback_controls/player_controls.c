@@ -45,6 +45,12 @@ static void player_thread(void *p1, void *p2, void *p3)
     ARG_UNUSED(p3);
 
     while (1) {
+        while (!g_play_requested) {
+            k_sleep(K_MSEC(20));
+        }
+
+        g_play_requested = false;
+
         build_wav_path(current_path, sizeof(current_path), file_names[current_file_index]);
         printk("Playing file: %s\n", current_path);
 
@@ -54,15 +60,17 @@ static void player_thread(void *p1, void *p2, void *p3)
 
         rc = play_current_file(current_path, &info);
         printk("play_current_file rc=%d next=%d prev=%d stop=%d\n",
-            rc, g_next_requested, g_prev_requested, g_stop_requested);
+               rc, g_next_requested, g_prev_requested, g_stop_requested);
 
         if (g_next_requested) {
             printk("reason: next requested\n");
             player_next();
+            g_play_requested = true;
         }
         else if (g_prev_requested) {
             printk("reason: prev requested\n");
             player_prev();
+            g_play_requested = true;
         }
         else if (g_stop_requested) {
             printk("reason: stop requested\n");
@@ -70,12 +78,15 @@ static void player_thread(void *p1, void *p2, void *p3)
         else if (rc == 0) {
             printk("reason: normal end of song\n");
             player_next();
-        } else {
-        printk("Playback error, staying on current file\n");
-        k_sleep(K_MSEC(200));
+            g_play_requested = true;
+        }
+        else {
+            printk("Playback error, staying on current file\n");
+            k_sleep(K_MSEC(200));
         }
     }
 }
+
 int player_control_init(void)
 {
     file_count = file_name_read(file_names);
@@ -101,6 +112,13 @@ int player_control_init(void)
     printk("Done listing files\n");
 
     return 0;
+}
+
+void player_set_current_index(int index)
+{
+    if (index >= 0 && index < file_count) {
+        current_file_index = index;
+    }
 }
 
 int player_control_start(void)

@@ -23,6 +23,9 @@ typedef struct _objects_t {
     lv_obj_t *songname2;
     lv_obj_t *songname3;
     lv_obj_t *songname4;
+    lv_obj_t *border_select;
+    lv_obj_t *play_button;
+    lv_obj_t *pause_button;
 } objects_t;
 
 extern objects_t objects;

@@ -5,10 +5,12 @@
 
 #define BUTTON_THREAD_STACK_SIZE 1024 
 #define BUTTON_THREAD_PRIORITY 5 
+#define LONG_PRESS_COUNT 80
 
 // this part reserves board memory for the thread stack
 K_THREAD_STACK_DEFINE(button_thread_stack, BUTTON_THREAD_STACK_SIZE);
 static struct k_thread button_thread_data;
+
 
 static void button_thread(void *p1, void *p2, void *p3)
 {
@@ -18,13 +20,45 @@ static void button_thread(void *p1, void *p2, void *p3)
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
 
+    int btn2_hold_count = 0;
+    int btn3_hold_count = 0;
+
+    bool btn2_long_press_fired = false;
+    bool btn3_long_press_fired = false;
+
     while (1) {
-        if (BTN_check_clear_pressed(BTN2)) {
-            g_next_requested = true;
+        /* BTN2 */
+        if (BTN_is_pressed(BTN2)) {
+            btn2_hold_count++;
+
+            if (btn2_hold_count > LONG_PRESS_COUNT && !btn2_long_press_fired) {
+                g_menu_play_requested = true;
+                btn2_long_press_fired = true;
+            }
+        } else {
+            if (btn2_hold_count > 0 && !btn2_long_press_fired) {
+                g_menu_up_requested = true;
+            }
+
+            btn2_hold_count = 0;
+            btn2_long_press_fired = false;
         }
 
-        if (BTN_check_clear_pressed(BTN3)) {
-            g_prev_requested = true;
+        /* BTN3 */
+        if (BTN_is_pressed(BTN3)) {
+            btn3_hold_count++;
+
+            if (btn3_hold_count > LONG_PRESS_COUNT && !btn3_long_press_fired) {
+                g_menu_play_requested = true;
+                btn3_long_press_fired = true;
+            }
+        } else {
+            if (btn3_hold_count > 0 && !btn3_long_press_fired) {
+                g_menu_down_requested = true;
+            }
+
+            btn3_hold_count = 0;
+            btn3_long_press_fired = false;
         }
 
         k_sleep(K_MSEC(10));

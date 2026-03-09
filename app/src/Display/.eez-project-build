@@ -12,6 +12,7 @@
     "ui.c",
     "ui.h",
     "ui_image_eie_logo.c",
+    "ui_image_pause_button.c",
     "ui_image_play_button.c",
     "vars.h"
   ]

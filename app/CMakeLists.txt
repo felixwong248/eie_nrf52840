@@ -32,4 +32,5 @@ target_sources(app PRIVATE
               src/display/actions.c
               src/display/ui_image_eie_logo.c
               src/display/ui_image_play_button.c
+              src/display/ui_image_pause_button.c
               )

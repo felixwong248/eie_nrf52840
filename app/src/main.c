@@ -40,13 +40,14 @@ int main(void)
     ui_init();
     display_blanking_off(display_dev);
     load_song_menu();
-    
+
     player_control_start();
 
     while (1) {
         lv_timer_handler();
         ui_tick();
-        k_sleep(K_MSEC(1));
+        menu_process_requests();
+        k_sleep(K_MSEC(10));
         
     }
 
