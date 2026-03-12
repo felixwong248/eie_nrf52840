@@ -63,16 +63,21 @@ static inline void reclaim_mem_block(void)
     }
 }
 
-static void i2s_stop_tx(bool error_path)
+static void i2s_stop_tx(bool immediate_stop)
 {
     int rc;
 
-    if (error_path) {
+    if (immediate_stop) {
         rc = i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DROP);
         printk("i2s_stop_tx(): DROP rc=%d\n", rc);
     } else {
         rc = i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DRAIN);
         printk("i2s_stop_tx(): DRAIN rc=%d\n", rc);
+
+        if (rc != 0) {
+            rc = i2s_trigger(i2s_dev, I2S_DIR_TX, I2S_TRIGGER_DROP);
+            printk("i2s_stop_tx(): DRAIN failed, DROP rc=%d\n", rc);
+        }
     }
 }
 

@@ -192,9 +192,8 @@ void ui_show_play_icon(void)
 
 void ui_show_pause_icon(void)
 {
-    /* hide play icon */
+
     lv_obj_add_flag(objects.play_button, LV_OBJ_FLAG_HIDDEN);
 
-    /* show pause icon */
     lv_obj_clear_flag(objects.pause_button, LV_OBJ_FLAG_HIDDEN);
 }

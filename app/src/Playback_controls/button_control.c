@@ -27,7 +27,7 @@ static void button_thread(void *p1, void *p2, void *p3)
     bool btn3_long_press_fired = false;
 
     while (1) {
-        /* BTN2 */
+
         if (BTN_is_pressed(BTN2)) {
             btn2_hold_count++;
 
@@ -44,7 +44,6 @@ static void button_thread(void *p1, void *p2, void *p3)
             btn2_long_press_fired = false;
         }
 
-        /* BTN3 */
         if (BTN_is_pressed(BTN3)) {
             btn3_hold_count++;
 
